@@ -1,7 +1,7 @@
 {
   "name": "package-json-upgrade",
   "displayName": "Package Json Upgrade",
-  "description": "Shows available updates in package.json files. Offers quick fix command to update them and to show the changelog.",
+  "description": "Shows available updates in package.json and pnpm-workspace.yaml. Offers quick fix command to update them and to show the changelog.",
   "version": "3.2.3",
   "publisher": "codeandstuff",
   "license": "MIT",
@@ -26,7 +26,8 @@
   },
   "activationEvents": [
     "onLanguage:json",
-    "onLanguage:jsonc"
+    "onLanguage:jsonc",
+    "onLanguage:yaml"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -94,11 +95,11 @@
     "commands": [
       {
         "command": "package-json-upgrade.toggle-show",
-        "title": "Toggle showing package.json available updates"
+        "title": "Toggle showing available dependency updates"
       },
       {
         "command": "package-json-upgrade.update-all",
-        "title": "Update all dependencies in the current package.json file"
+        "title": "Update all dependencies in the current file"
       }
     ]
   },
@@ -106,6 +107,10 @@
     "vscode:prepublish": "webpack --mode production",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "build:vsix": "npm run vscode:prepublish && npm run package:vsix",
+    "package:vsix": "vsce package",
+    "install:vsix": "node -e \"const {execSync}=require('child_process'); const fs=require('fs'); const vsix=fs.readdirSync('.').filter(f=>f.endsWith('.vsix')).sort((a,b)=>fs.statSync(b).mtimeMs-fs.statSync(a).mtimeMs)[0]; if(!vsix){console.error('No .vsix found. Run npm run build:vsix first.'); process.exit(1);} execSync('code --install-extension '+vsix+' --force',{stdio:'inherit'});\"",
+    "build-install:vsix": "npm run build:vsix && npm run install:vsix",
     "pretest-vscode": "npm run compile",
     "test-vscode": "vscode-test",
     "test-jest": "jest",
@@ -132,7 +137,8 @@
     "libnpmconfig": "1.2.1",
     "node-fetch": "2.7.0",
     "npm-registry-fetch": "14.0.5",
-    "semver": "7.7.3"
+    "semver": "7.7.3",
+    "yaml": "^2.5.0"
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",

@@ -14,6 +14,7 @@ import {
 } from 'semver'
 import { getConfig } from './config'
 import { getNpmConfig } from './npmConfig'
+import { getPnpmWorkspaceDependencyInformation } from './pnpm'
 import { AsyncState, Dict, Loader, StrictDict } from './types'
 
 export interface NpmLoader<T> {
@@ -304,6 +305,43 @@ export const refreshPackageJsonData = (
     return promises
   } catch (e) {
     console.warn(`Failed to parse package.json: ${packageJsonFilePath}`)
+    return [Promise.resolve()]
+  }
+}
+
+export const refreshPnpmWorkspaceData = (
+  pnpmWorkspaceString: string,
+  pnpmWorkspaceFilePath: string,
+): Promise<void>[] => {
+  const cacheCutoff = new Date(new Date().getTime() - 1000 * 60 * 120) // 120 minutes
+
+  try {
+    const dependencies = getPnpmWorkspaceDependencyInformation(pnpmWorkspaceString).flatMap(
+      (d) => d.deps,
+    )
+
+    const promises = dependencies
+      .map(({ dependencyName }) => {
+        const cache = npmCache[dependencyName]
+        if (
+          cache === undefined ||
+          cache.asyncstate === AsyncState.NotStarted ||
+          (cache.item !== undefined && cache.item.date.getTime() < cacheCutoff.getTime())
+        ) {
+          const packageJsonPath = pnpmWorkspaceFilePath.replace(
+            'pnpm-workspace.yaml',
+            'package.json',
+          )
+          return fetchNpmData(dependencyName, packageJsonPath)
+        } else {
+          return npmCache[dependencyName]?.promise
+        }
+      })
+      .filter((p): p is Promise<void> => p !== undefined)
+
+    return promises
+  } catch (e) {
+    console.warn(`Failed to parse pnpm-workspace.yaml: ${pnpmWorkspaceFilePath}`)
     return [Promise.resolve()]
   }
 }

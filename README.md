@@ -1,6 +1,6 @@
 # package-json-upgrade
 
-Shows available updates in package.json. Offers quick actions to guide you in your updating.
+Shows available updates in `package.json` and `pnpm-workspace.yaml` (catalogs). Offers quick actions to guide you in your updating.
 
 ## Preview
 
@@ -16,7 +16,7 @@ These quick actions can update the dependency, but also links to the homepage an
 
 The extension will pick up your npm configurations and use them, so it works with proxies, private npm registries and scopes.
 
-The extension also adds a command to update all dependencies in the package.json file.
+The extension also adds a command to update all dependencies in the current supported file.
 
 ## Extension Settings
 
