@@ -74,6 +74,19 @@ export const cleanNpmCache = () => {
   changelogCache = {}
 }
 
+export const clearNpmCacheForDependencies: (dependencyNames: string[]) => void = (
+  dependencyNames,
+) => {
+  dependencyNames.forEach((dependencyName) => {
+    // Removing the cached item forces a refetch next time `refresh*Data` runs.
+    // This is intentionally scoped to the opened file's dependencies.
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete npmCache[dependencyName]
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete changelogCache[dependencyName]
+  })
+}
+
 export const getAllCachedNpmData = () => {
   return npmCache
 }

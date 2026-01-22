@@ -1,9 +1,12 @@
 import * as vscode from 'vscode'
 import { Config, getConfig, setConfig } from './config'
-import { cleanNpmCache } from './npm'
+import { cleanNpmCache, clearNpmCacheForDependencies } from './npm'
 import { clearDecorations, handleFileDecoration } from './texteditor'
 import { UpdateAction } from './updateAction'
 import { updateAll } from './updateAll'
+import { getFileType } from './file'
+import { getPackageJsonDependencyInformation } from './packageJson'
+import { getPnpmWorkspaceDependencyInformation } from './pnpm'
 
 export const OPEN_URL_COMMAND = 'package-json-upgrade.open-url-command'
 
@@ -56,10 +59,30 @@ export function activate(context: vscode.ExtensionContext) {
 
   checkCurrentFiles(showDecorations)
 
+  const invalidateCacheForDocument = (document: vscode.TextDocument) => {
+    const fileType = getFileType(document)
+    if (fileType == null) {
+      return
+    }
+
+    try {
+      const text = document.getText()
+      const dependencyGroups =
+        fileType === 'package.json'
+          ? getPackageJsonDependencyInformation(text)
+          : getPnpmWorkspaceDependencyInformation(text)
+
+      const dependencyNames = dependencyGroups.flatMap((g) => g.deps.map((d) => d.dependencyName))
+      clearNpmCacheForDependencies(dependencyNames)
+    } catch {
+      // If the document can't be parsed, don't block editor open.
+    }
+  }
+
   const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument(
     (document: vscode.TextDocument) => {
       if (showDecorations) {
-        handleFileDecoration(document)
+        invalidateCacheForDocument(document)
       }
     },
   )
