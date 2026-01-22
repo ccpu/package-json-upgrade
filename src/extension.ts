@@ -56,7 +56,14 @@ export function activate(context: vscode.ExtensionContext) {
 
   checkCurrentFiles(showDecorations)
 
-  // vscode.workspace.onDidOpenTextDocument((e: vscode.TextDocument) => {})
+  const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument(
+    (document: vscode.TextDocument) => {
+      if (showDecorations) {
+        handleFileDecoration(document)
+      }
+    },
+  )
+
   // vscode.workspace.onDidSaveTextDocument((e: vscode.TextDocument) => {})
   // vscode.window.onDidChangeVisibleTextEditors((e: vscode.TextEditor[]) => {})
 
@@ -79,6 +86,7 @@ export function activate(context: vscode.ExtensionContext) {
     onConfigChange,
     onDidChangeActiveTextEditor,
     onDidChangeTextDocument,
+    onDidOpenTextDocument,
     toggleShowCommand,
     updateAllCommand,
   )
