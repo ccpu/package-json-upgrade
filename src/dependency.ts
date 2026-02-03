@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+
 import { getFileType } from './file'
 import { getPackageJsonDependencyInformation } from './packageJson'
 import { getPnpmWorkspaceDependencyInformation } from './pnpm'

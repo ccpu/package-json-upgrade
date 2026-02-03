@@ -1,4 +1,5 @@
-import { LineCounter, Pair, Scalar, YAMLMap, isMap, isScalar, parseDocument } from 'yaml'
+import { isMap, isScalar, LineCounter, Pair, parseDocument, Scalar, YAMLMap } from 'yaml'
+
 import type { DependencyGroups } from './dependency'
 
 export const getPnpmWorkspaceDependencyInformation = (yamlAsString: string): DependencyGroups[] => {
@@ -11,17 +12,15 @@ export const getPnpmWorkspaceDependencyInformation = (yamlAsString: string): Dep
     throw new Error('unexpected type')
   }
 
-  const catalog = root.items.find(
-    (i: Pair<unknown, unknown>) => isScalar<string>(i.key) && i.key.value === 'catalog',
-  )
+  const catalog = root.items.find((i: Pair) => isScalar<string>(i.key) && i.key.value === 'catalog')
   const catalogs = root.items.find(
-    (i: Pair<unknown, unknown>) => isScalar<string>(i.key) && i.key.value === 'catalogs',
+    (i: Pair) => isScalar<string>(i.key) && i.key.value === 'catalogs',
   )
 
-  const dependencyGroups: Pair<unknown, unknown>[] = [...(catalog ? [catalog] : [])]
+  const dependencyGroups: Pair[] = [...(catalog ? [catalog] : [])]
 
   if (catalogs?.value != null && isMap<Scalar, YAMLMap>(catalogs.value)) {
-    catalogs.value.items.forEach((item: Pair<unknown, unknown>) => {
+    catalogs.value.items.forEach((item: Pair) => {
       if (!isMap<Scalar, YAMLMap>(item.value)) {
         throw new Error('unexpected type')
       }
@@ -32,11 +31,8 @@ export const getPnpmWorkspaceDependencyInformation = (yamlAsString: string): Dep
   return dependencyGroups.map((a) => toDependencyGroup(a, lineCounter))
 }
 
-function toDependencyGroup(
-  dependencyProperty: Pair<unknown, unknown>,
-  lineCounter: LineCounter,
-): DependencyGroups {
-  if (!isMap<Scalar<string>, unknown>(dependencyProperty.value)) {
+function toDependencyGroup(dependencyProperty: Pair, lineCounter: LineCounter): DependencyGroups {
+  if (!isMap<Scalar<string>>(dependencyProperty.value)) {
     throw new Error('unexpected type')
   }
 
@@ -47,7 +43,7 @@ function toDependencyGroup(
   }
   const { line: startLine } = lineCounter.linePos(offset)
 
-  const dependencies = dependencyProperty.value.items.map((dep: Pair<unknown, unknown>) => {
+  const dependencies = dependencyProperty.value.items.map((dep: Pair) => {
     if (!isScalar<string>(dep.key)) {
       throw new Error('unexpected type')
     }
