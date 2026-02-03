@@ -1,11 +1,13 @@
-import * as assert from 'assert'
+import { describe, test } from 'node:test'
 
+import * as assert from 'assert'
 import { readFileSync } from 'fs'
+
 import { getPnpmWorkspaceDependencyInformation } from '../pnpm'
 
 describe('pnpmWorkspace', () => {
   test('should be able to correctly parse a simple pnpm-workspace.yaml', () => {
-    const pnpmWorkspaceBuffer = readFileSync('./src/test-jest/testdata/pnpm-workspace-test1.yaml')
+    const pnpmWorkspaceBuffer = readFileSync('./src/test-node/testdata/pnpm-workspace-test1.yaml')
     const pnpmWorkspace = pnpmWorkspaceBuffer.toString()
     const result = getPnpmWorkspaceDependencyInformation(pnpmWorkspace)
     const dependencies = result.map((r) => r.deps).flat()

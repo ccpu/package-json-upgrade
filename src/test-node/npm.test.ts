@@ -1,14 +1,16 @@
+import { before, describe, test } from 'node:test'
+
 import * as assert from 'assert'
 
+import { Config, setConfig } from '../config'
 import {
   DependencyUpdateInfo,
-  NpmData,
-  VersionData,
   getLatestVersionWithIgnoredVersions,
   getPossibleUpgrades,
   getPossibleUpgradesWithIgnoredVersions,
+  NpmData,
+  VersionData,
 } from '../npm'
-import { Config, setConfig } from '../config'
 
 const testData: NpmData = {
   'dist-tags': {
@@ -63,7 +65,7 @@ const testData: NpmData = {
 }
 
 describe('Npm Test Suite', () => {
-  beforeAll(() => {
+  before(() => {
     const config: Config = {
       showUpdatesAtStart: true,
       showOverviewRulerColor: true,

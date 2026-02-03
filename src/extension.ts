@@ -1,16 +1,34 @@
 import * as vscode from 'vscode'
+
 import { Config, getConfig, setConfig } from './config'
+import { getFileType } from './file'
+import { initGithubCache } from './githubCache'
+import { initLogger } from './log'
 import { cleanNpmCache, clearNpmCacheForDependencies } from './npm'
+import { getPackageJsonDependencyInformation } from './packageJson'
+import { getPnpmWorkspaceDependencyInformation } from './pnpm'
 import { clearDecorations, handleFileDecoration } from './texteditor'
 import { UpdateAction } from './updateAction'
 import { updateAll } from './updateAll'
-import { getFileType } from './file'
-import { getPackageJsonDependencyInformation } from './packageJson'
-import { getPnpmWorkspaceDependencyInformation } from './pnpm'
 
 export const OPEN_URL_COMMAND = 'package-json-upgrade.open-url-command'
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
+  try {
+    await activateWrapped(context)
+  } catch (e) {
+    console.error(`failed to start`)
+    if (e instanceof Error) {
+      console.error(e.name, e.message)
+      console.error(e.stack)
+    }
+  }
+}
+
+async function activateWrapped(context: vscode.ExtensionContext) {
+  initLogger(context)
+  await initGithubCache(context.globalState)
+
   fixConfig()
 
   let showDecorations = getConfig().showUpdatesAtStart
@@ -151,6 +169,9 @@ export function deactivate() {
 
 const fixConfig = () => {
   const workspaceConfig = vscode.workspace.getConfiguration('package-json-upgrade')
+
+  const decorationString = workspaceConfig.get<string>('decorationString')
+
   const config: Config = {
     showUpdatesAtStart: workspaceConfig.get<boolean>('showUpdatesAtStart') === true,
     showOverviewRulerColor: workspaceConfig.get<boolean>('showOverviewRulerColor') === true,
@@ -160,8 +181,8 @@ const fixConfig = () => {
     patchUpgradeColorOverwrite: workspaceConfig.get<string>('patchUpgradeColorOverwrite') ?? '',
     prereleaseUpgradeColorOverwrite:
       workspaceConfig.get<string>('prereleaseUpgradeColorOverwrite') ?? '',
-    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-    decorationString: workspaceConfig.get<string>('decorationString') || '\t-> %s',
+    decorationString:
+      decorationString !== undefined && decorationString !== '' ? decorationString : '\t-> %s',
     ignorePatterns: workspaceConfig.get<string[]>('ignorePatterns') ?? [],
     ignoreVersions:
       workspaceConfig.get<Record<string, string | undefined | string[]>>('ignoreVersions') ?? {},

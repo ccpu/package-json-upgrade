@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { TextEditorDecorationType } from 'vscode'
+
 import { getConfig } from './config'
 import { decorateDiscreet, getDecoratorForUpdate, getUpdateDescription } from './decorations'
 import { DependencyGroups } from './dependency'
@@ -71,7 +72,7 @@ const loadPnpmWorkspaceDecoration = async (document: vscode.TextDocument, startT
 
   try {
     await Promise.race([...promises, Promise.resolve()])
-  } catch (e) {
+  } catch (_) {
     //
   }
 
@@ -88,7 +89,7 @@ const loadPnpmWorkspaceDecoration = async (document: vscode.TextDocument, startT
     ms: 1000,
   })
 
-  return paintDecorations(document, dependencyGroups, false, startTime)
+  paintDecorations(document, dependencyGroups, false, startTime)
 }
 
 const loadPackageJsonDecoration = async (document: vscode.TextDocument, startTime: number) => {
@@ -99,7 +100,7 @@ const loadPackageJsonDecoration = async (document: vscode.TextDocument, startTim
 
   try {
     await Promise.race([...promises, Promise.resolve()])
-  } catch (e) {
+  } catch (_e) {
     //
   }
 
@@ -116,7 +117,7 @@ const loadPackageJsonDecoration = async (document: vscode.TextDocument, startTim
     ms: 1000,
   })
 
-  return paintDecorations(document, dependencyGroups, false, startTime)
+  paintDecorations(document, dependencyGroups, false, startTime)
 }
 
 const paintDecorations = (

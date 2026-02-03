@@ -1,21 +1,23 @@
-import fetch from 'node-fetch'
 import * as npmRegistryFetch from 'npm-registry-fetch'
 import {
-  ReleaseType,
-  SemVer,
   coerce,
   diff,
   eq,
   gt,
   lte,
+  ReleaseType,
   satisfies,
+  SemVer,
   valid,
   validRange,
 } from 'semver'
+
+import { retrieveAndCacheChangelog } from './changelog'
 import { getConfig } from './config'
+import { logError } from './log'
 import { getNpmConfig } from './npmConfig'
 import { getPnpmWorkspaceDependencyInformation } from './pnpm'
-import { AsyncState, Dict, Loader, StrictDict } from './types'
+import { AsyncState, Dict, StrictDict } from './types'
 
 export interface NpmLoader<T> {
   asyncstate: AsyncState
@@ -39,10 +41,13 @@ export interface NpmData {
     [key in string]: VersionData
   }
   homepage?: string
-  // repository: {
-  //   type: string
-  //   url: string
-  // }
+  repository?:
+    | {
+        type?: string
+        url?: string
+        directory?: string
+      }
+    | string
 }
 
 export interface VersionData {
@@ -66,12 +71,8 @@ export interface CacheItem {
 
 let npmCache: Dict<string, NpmLoader<CacheItem>> = {}
 
-// dependencyname pointing to a potential changelog
-let changelogCache: Dict<string, Loader<string>> = {}
-
 export const cleanNpmCache = () => {
   npmCache = {}
-  changelogCache = {}
 }
 
 export const clearNpmCacheForDependencies: (dependencyNames: string[]) => void = (
@@ -82,8 +83,6 @@ export const clearNpmCacheForDependencies: (dependencyNames: string[]) => void =
     // This is intentionally scoped to the opened file's dependencies.
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete npmCache[dependencyName]
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    delete changelogCache[dependencyName]
   })
 }
 
@@ -97,10 +96,6 @@ export const getCachedNpmData = (dependencyName: string) => {
 
 export const setCachedNpmData = (newNpmCache: Dict<string, NpmLoader<CacheItem>>) => {
   npmCache = newNpmCache
-}
-
-export const getCachedChangelog = (dependencyName: string) => {
-  return changelogCache[dependencyName]
 }
 
 export const getLatestVersion = (
@@ -243,7 +238,7 @@ const getRawPossibleUpgradeList = (
   }
 
   return Object.values(npmData.versions)
-    .filter((version) => valid(version.version))
+    .filter((version) => valid(version.version) != null)
     .filter((version) => gt(version.version, coercedVersion))
     .filter((version) => {
       if (ignoredVersions === undefined) {
@@ -270,7 +265,7 @@ const getRawPossibleUpgradeList = (
 const isVersionIgnored = (version: VersionData, dependencyName: string, ignoredVersion: string) => {
   if (validRange(ignoredVersion) === null) {
     console.warn(
-      `invalid semver range detected in ignored version for depedency ${dependencyName}: ${ignoredVersion}`,
+      `invalid semver range detected in ignored version for dependency ${dependencyName}: ${ignoredVersion}`,
     )
     return true
   }
@@ -316,7 +311,7 @@ export const refreshPackageJsonData = (
       .filter((p): p is Promise<void> => p !== undefined)
 
     return promises
-  } catch (e) {
+  } catch (_) {
     console.warn(`Failed to parse package.json: ${packageJsonFilePath}`)
     return [Promise.resolve()]
   }
@@ -353,7 +348,7 @@ export const refreshPnpmWorkspaceData = (
       .filter((p): p is Promise<void> => p !== undefined)
 
     return promises
-  } catch (e) {
+  } catch (_e) {
     console.warn(`Failed to parse pnpm-workspace.yaml: ${pnpmWorkspaceFilePath}`)
     return [Promise.resolve()]
   }
@@ -380,10 +375,8 @@ const fetchNpmData = (dependencyName: string, packageJsonPath: string) => {
 
   promise
     .then((json) => {
-      if (changelogCache[dependencyName] === undefined) {
-        // we currently do not wait for this to speed things up
-        void findChangelog(dependencyName, json)
-      }
+      // Populate changelog cache (not awaited to speed things up)
+      void retrieveAndCacheChangelog(json)
       npmCache[dependencyName] = {
         asyncstate: AsyncState.Fulfilled,
         startTime,
@@ -393,15 +386,9 @@ const fetchNpmData = (dependencyName: string, packageJsonPath: string) => {
         },
       }
     })
-    .catch((e) => {
-      /* eslint-disable */
-      console.error(`failed to load dependency ${dependencyName}`)
-      console.error(`status code: ${e?.statusCode}`)
-      console.error(`uri: ${e?.uri}`)
-      console.error(`message: ${e?.message}`)
-      console.error(`config used: ${JSON.stringify(conf, null, 2)}`)
-      console.error(`Entire error: ${JSON.stringify(e, null, 2)}`)
-      /* eslint-enable */
+    .catch((e: unknown) => {
+      logError(`failed to load dependency ${dependencyName}`, e)
+
       npmCache[dependencyName] = {
         asyncstate: AsyncState.Rejected,
         startTime,
@@ -409,34 +396,4 @@ const fetchNpmData = (dependencyName: string, packageJsonPath: string) => {
     })
 
   return promise
-}
-
-const findChangelog = async (dependencyName: string, npmData: NpmData) => {
-  if (npmData.homepage === undefined) {
-    return
-  }
-  // TODO support other stuff than github?
-  const regexResult = /(https?:\/\/github\.com\/[-\w/.]*\/[-\w/.]*)(#[-\w/.]*)?/.exec(
-    npmData.homepage,
-  )
-  if (regexResult === null) {
-    return
-  }
-
-  changelogCache[dependencyName] = {
-    asyncstate: AsyncState.InProgress,
-  }
-  const baseGithubUrl = regexResult[1]
-  const changelogUrl = `${baseGithubUrl}/blob/master/CHANGELOG.md`
-  const result = await fetch(changelogUrl)
-  if (result.status >= 200 && result.status < 300) {
-    changelogCache[dependencyName] = {
-      asyncstate: AsyncState.Fulfilled,
-      item: changelogUrl,
-    }
-  } else {
-    changelogCache[dependencyName] = {
-      asyncstate: AsyncState.Rejected,
-    }
-  }
 }
