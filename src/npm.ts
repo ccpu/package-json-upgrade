@@ -414,6 +414,29 @@ export const isRegistryVersion = (version: string): boolean => {
   return validRange(version) != null && valid(coerce(version)) != null
 }
 
+// Decides whether a dependency name is one we may look up in the registry.
+//
+// npm-registry-fetch resolves a name against the configured registry, but only
+// when the name is not already a fully qualified URL. A name such as
+// "https://example.com/beacon" is used as the request url as it stands, so the
+// registry is bypassed entirely. Dependency names come out of files we did not
+// write, so that would let any package.json we open point a request at any host
+// it likes, just by naming it as a dependency.
+//
+// No credential would go along with it - npm-registry-fetch attaches auth by the
+// host of the request url, so a foreign host matches nothing in the user's
+// .npmrc - but the request is still one we have no business making: it tells
+// that host the file was opened, from this ip, and it reaches hosts on the
+// user's network that the user never asked us to contact.
+//
+// The check mirrors the one npm-registry-fetch makes, so the two cannot drift
+// apart. Real package names never parse as a url: npm forbids ":" in a name, and
+// a url without a scheme, "//example.com/x" say, does not parse either and is
+// resolved against the registry like any other name.
+export const isRegistryDependencyName = (dependencyName: string): boolean => {
+  return !URL.canParse(dependencyName)
+}
+
 /**
  * Starts (or reuses) a registry fetch for every dependency given, and returns the
  * fetches still in flight. The dependencies are the ones we are about to decorate,
@@ -423,7 +446,8 @@ export const isRegistryVersion = (version: string): boolean => {
  * into its real version (or dropped) by toDependency while parsing, and a catalog
  * entry in pnpm-workspace.yaml never references a catalog itself. isRegistryVersion
  * is the single guard on what we fetch, and it skips an unresolved `catalog:` along
- * with every other non-registry spec.
+ * with every other non-registry spec. isRegistryDependencyName is the matching
+ * guard on the name.
  */
 export const refreshDependencies = (
   dependencies: readonly (readonly [string, string])[],
@@ -433,6 +457,7 @@ export const refreshDependencies = (
   const fetchedDependencies = new Set<string>()
 
   return dependencies
+    .filter(([dependencyName, _version]) => isRegistryDependencyName(dependencyName))
     .filter(([_dependencyName, version]) => isRegistryVersion(version))
     .filter(([dependencyName, _version]) => {
       // The cache is keyed by name only, so one fetch covers every occurrence.
