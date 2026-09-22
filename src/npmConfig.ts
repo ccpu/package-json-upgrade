@@ -10,6 +10,8 @@ let skippedNpmConfigLastTime: boolean | undefined
 
 const packageJsonPathToConfMap: Dict<string, npmRegistryFetch.Options> = {}
 
+const environmentVariablePattern = /(?<!\\)(\\*)\$\{([^${}]+)\}/g
+
 const getNpmConfigEnvironmentValue = (optionName: string, environment: NodeJS.ProcessEnv) => {
   return (
     environment[`npm_config_${optionName}`] ?? environment[`NPM_CONFIG_${optionName.toUpperCase()}`]
@@ -32,6 +34,31 @@ const getGlobalNpmConfigPath = (environment: NodeJS.ProcessEnv, platform: NodeJS
   return prefix === undefined ? undefined : join(prefix, 'etc', 'npmrc')
 }
 
+/** Expands `.npmrc` environment-variable references using npm's escaping semantics. */
+export const expandNpmConfigEnvironmentVariables = (
+  npmConfig: npmRegistryFetch.Options,
+  environment: NodeJS.ProcessEnv = process.env,
+): npmRegistryFetch.Options => {
+  return Object.fromEntries(
+    Object.entries(npmConfig).map(([key, value]) => {
+      if (typeof value !== 'string') {
+        return [key, value]
+      }
+
+      const expandedValue = value.replace(
+        environmentVariablePattern,
+        (originalValue, escapes: string, variableName: string) => {
+          const environmentValue = environment[variableName] ?? `$\{${variableName}}`
+          return escapes.length % 2 === 1
+            ? originalValue.slice((escapes.length + 1) / 2)
+            : escapes.slice(escapes.length / 2) + environmentValue
+        },
+      )
+      return [key, expandedValue]
+    }),
+  ) as npmRegistryFetch.Options
+}
+
 /** Builds npm config lookup options for a package's project and global configuration files. */
 export const getNpmConfigReadOptions = (
   packageJsonPath: string,
@@ -52,7 +79,7 @@ export const getNpmConfig = (packageJsonPath: string): npmRegistryFetch.Options 
       conf = {}
     } else {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      conf = config
+      const npmConfig = config
         .read(
           {
             // here we can override config
@@ -66,6 +93,7 @@ export const getNpmConfig = (packageJsonPath: string): npmRegistryFetch.Options 
           getNpmConfigReadOptions(packageJsonPath),
         )
         .toJSON() as npmRegistryFetch.Options
+      conf = expandNpmConfigEnvironmentVariables(npmConfig)
       packageJsonPathToConfMap[packageJsonPath] = conf
     }
 

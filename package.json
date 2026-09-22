@@ -2,7 +2,7 @@
   "name": "package-json-upgrade",
   "displayName": "Package Json Upgrade",
   "description": "Shows available updates in package.json and pnpm-workspace.yaml. Offers quick fix command to update them and to show the changelog.",
-  "version": "3.3.1",
+  "version": "3.3.4",
   "publisher": "ccpu",
   "license": "MIT",
   "icon": "logo/icon.webp",
@@ -121,7 +121,8 @@
     "pre-commit": "lint-staged",
     "pre-push": "npm run lint && npm run typecheck && npm run test",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "install:local": "node ./scripts/install-local.js"
   },
   "lint-staged": {
     "*.{json,md,css,scss}": [
