@@ -154,7 +154,7 @@
   },
   "dependencies": {
     "@pnpm/npm-conf": "3.0.3",
-    "js-yaml": "5.4.1",
+    "js-yaml": "5.4.2",
     "jsonc-parser": "3.3.1",
     "npm-registry-fetch": "20.0.1",
     "semver": "7.8.5"
@@ -165,7 +165,7 @@
     "@types/node": "22.20.1",
     "@types/npm-registry-fetch": "8.0.9",
     "@types/semver": "7.8.0",
-    "@types/vscode": "1.118.0",
+    "@types/vscode": "1.138.0",
     "@vscode/test-cli": "0.0.15",
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.9.2",
@@ -173,18 +173,20 @@
     "eslint-plugin-no-only-tests": "3.4.0",
     "eslint-plugin-simple-import-sort": "14.0.0",
     "husky": "9.1.7",
-    "lint-staged": "17.5.0",
-    "prettier": "3.9.6",
+    "lint-staged": "17.5.1",
+    "prettier": "3.9.8",
     "ts-loader": "9.6.2",
     "ts-node": "10.9.2",
-    "tsx": "4.23.13",
+    "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.70.0",
-    "webpack": "5.110.3",
+    "typescript-eslint": "8.70.1",
+    "webpack": "5.111.1",
     "webpack-cli": "7.2.3"
   },
   "//": "override needed due to this: https://github.com/pgsandstrom/package-json-upgrade/issues/59",
   "overrides": {
-    "@npmcli/agent": "2.0.0"
+    "@npmcli/agent": "2.0.0",
+    "serialize-javascript": "^7.1.1",
+    "diff": "^8.0.4"
   }
 }
