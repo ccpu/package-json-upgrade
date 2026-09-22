@@ -16,9 +16,11 @@
  *   npm run install:local -- [options]
  *
  * Options:
- *   --code <cmd>   VS Code CLI to install into (default: "code"; use "code-insiders").
- *   --skip-build   Repackage + reinstall the current dist/ without rebuilding.
- *   --keep-vsix    Keep the generated .vsix (default: removed after install).
+ *   --code <cmd>     VS Code CLI to install into (default: "code"; use "code-insiders").
+ *   --skip-build     Repackage + reinstall the current dist/ without rebuilding.
+ *   --keep-vsix      Keep the generated .vsix (default: removed after install).
+ *   --strict-engine  Package against engines.vscode as declared, even when the
+ *                    local VS Code is older (the install then fails).
  */
 'use strict'
 
@@ -40,6 +42,7 @@ function opt(name, fallback) {
 const codeCli = opt('--code', 'code')
 const skipBuild = flag('--skip-build')
 const keepVsix = flag('--keep-vsix')
+const strictEngine = flag('--strict-engine')
 
 // --- helpers -----------------------------------------------------------------
 const colors = {
@@ -126,6 +129,57 @@ function installedVersion(cli, extId) {
   return line ? line.slice(prefix.length) : null
 }
 
+// Parse "1.138.0" (or "^1.138.0") into [1, 138, 0]; null when unparseable.
+function parseVersion(value) {
+  const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(value ?? ''))
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null
+}
+
+function compareVersions(a, b) {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) {
+      return a[i] - b[i]
+    }
+  }
+  return 0
+}
+
+// Version of the VS Code the CLI points at; `code --version` prints it first.
+function codeVersion(cli) {
+  const res = spawnSync(`${cli} --version`, { shell: true, encoding: 'utf8' })
+  if (res.status !== 0 || !res.stdout) {
+    return null
+  }
+  return parseVersion(res.stdout.split(/\r?\n/)[0])
+}
+
+// VS Code refuses to install a .vsix whose engines.vscode is newer than the
+// editor itself. package.json declares the engine we publish against, which may
+// legitimately be ahead of the VS Code installed here, so for this local build
+// only we lower engines.vscode (and @types/vscode, which vsce validates against
+// it) to the installed version, package, then restore the file byte for byte.
+// Returns a restore function, or null when no patch was needed.
+function relaxEngine(pkgPath, installed) {
+  const original = fs.readFileSync(pkgPath, 'utf8')
+  const required = parseVersion(JSON.parse(original).engines?.vscode)
+  if (!required || !installed || compareVersions(installed, required) >= 0) {
+    return null
+  }
+
+  const local = installed.join('.')
+  const patched = original
+    .replace(/("engines"\s*:\s*\{[^}]*"vscode"\s*:\s*")[^"]*(")/, `$1^${local}$2`)
+    .replace(/("@types\/vscode"\s*:\s*")[^"]*(")/, `$1${local}$2`)
+  fs.writeFileSync(pkgPath, patched)
+  console.log(
+    colors.yellow(
+      `==> Local VS Code is ${local}, engines.vscode is ^${required.join('.')}; packaging ` +
+        `against ^${local} for this install only (--strict-engine to opt out).`,
+    ),
+  )
+  return () => fs.writeFileSync(pkgPath, original)
+}
+
 // --- main --------------------------------------------------------------------
 function main() {
   console.log(colors.cyan(`==> Repo: ${repoRoot}`))
@@ -141,7 +195,8 @@ function main() {
     )
   }
 
-  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
+  const pkgPath = path.join(repoRoot, 'package.json')
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
   const vsixName = `${pkg.name}-${pkg.version}.vsix`
   const vsixPath = path.join(repoRoot, vsixName)
   const extId = `${pkg.publisher}.${pkg.name}`
@@ -170,19 +225,26 @@ function main() {
     run(['npm', 'install'])
   }
 
-  // 2. Build
-  if (!skipBuild) {
-    console.log(colors.yellow('==> Building production bundle (npm run package)...'))
-    run(['npm', 'run', 'package'])
-  } else {
-    console.log(colors.gray('==> Skipping build (--skip-build).'))
-  }
-
-  // 3. Package the .vsix
+  // 2 + 3. Build and package the .vsix, with engines.vscode temporarily lowered
+  // to whatever VS Code is installed here when it is behind the declared engine.
   // node_modules is excluded via .vscodeignore and everything is bundled by
   // webpack into dist/, so package with --no-dependencies.
-  console.log(colors.yellow('==> Packaging .vsix...'))
-  run(['npx', '--yes', '@vscode/vsce', 'package', '--no-dependencies', '--out', q(vsixPath)])
+  const restoreEngine = strictEngine ? null : relaxEngine(pkgPath, codeVersion(resolvedCodeCli))
+  try {
+    if (!skipBuild) {
+      console.log(colors.yellow('==> Building production bundle (npm run package)...'))
+      run(['npm', 'run', 'package'])
+    } else {
+      console.log(colors.gray('==> Skipping build (--skip-build).'))
+    }
+
+    console.log(colors.yellow('==> Packaging .vsix...'))
+    run(['npx', '--yes', '@vscode/vsce', 'package', '--no-dependencies', '--out', q(vsixPath)])
+  } finally {
+    if (restoreEngine) {
+      restoreEngine()
+    }
+  }
 
   // 4. Uninstall the previously installed version (if any), then install.
   if (existingVersion) {

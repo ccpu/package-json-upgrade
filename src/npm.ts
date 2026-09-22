@@ -532,7 +532,9 @@ const fetchNpmData = (dependencyName: string, packageJsonPath: string) => {
     })
     .catch((e: unknown) => {
       const fetchError = categorizeFetchError(e)
-      logError(`failed to load dependency ${dependencyName} (${fetchError.type})`, e)
+      // Registry-controlled error messages can reflect request data. Keep the
+      // diagnostic to the safe category instead of logging the raw error.
+      logError(`failed to load dependency ${dependencyName} (${fetchError.type})`)
 
       npmCache[dependencyName] = {
         asyncstate: AsyncState.Rejected,

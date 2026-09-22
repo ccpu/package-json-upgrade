@@ -2,7 +2,7 @@
   "name": "package-json-upgrade",
   "displayName": "Package Json Upgrade",
   "description": "Shows available updates in package.json and pnpm-workspace.yaml files. Offers quick fix command to update them and to show the changelog.",
-  "version": "3.8.3",
+  "version": "3.8.8",
   "publisher": "ccpu",
   "license": "MIT",
   "icon": "logo/icon.webp",
@@ -51,7 +51,7 @@
         "package-json-upgrade.skipNpmConfig": {
           "type": "boolean",
           "default": false,
-          "description": "Skip reading your npm configuration. Check this to skip using configuration such as proxies and caching that might be defined in your npm configuration. Try this out if the extension appears to not be working."
+          "description": "Skip reading your trusted npm configuration. Per-project .npmrc files are never read, so opening a repository cannot expose credentials through its registry, proxy, or environment-variable settings."
         },
         "package-json-upgrade.majorUpgradeColorOverwrite": {
           "type": "string",
@@ -127,8 +127,6 @@
     "watch": "tsc -watch -p ./",
     "build:vsix": "npm run vscode:prepublish && npm run package:vsix",
     "package:vsix": "vsce package",
-    "install:vsix": "node -e \"const {execSync}=require('child_process'); const fs=require('fs'); const vsix=fs.readdirSync('.').filter(f=>f.endsWith('.vsix')).sort((a,b)=>fs.statSync(b).mtimeMs-fs.statSync(a).mtimeMs)[0]; if(!vsix){console.error('No .vsix found. Run npm run build:vsix first.'); process.exit(1);} execSync('code --install-extension '+vsix+' --force',{stdio:'inherit'});\"",
-    "build-install:vsix": "npm run build:vsix && npm run install:vsix",
     "pretest-vscode": "npm run compile",
     "test-vscode": "vscode-test",
     "test-node": "node --import tsx --test src/test-node/*.test.ts",

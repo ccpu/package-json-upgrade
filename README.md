@@ -14,7 +14,7 @@ These quick actions can update the dependency, but also links to the homepage an
 
 ![feature X](images/preview2.png)
 
-The extension will pick up your npm configurations and use them, so it works with proxies, private npm registries and scopes.
+The extension reads trusted user, environment, and global npm configuration, so it works with proxies, private npm registries and scopes. It never reads the repository's `.npmrc`, preventing a project from redirecting requests through its proxy or expanding environment variables into credentials when you open its `package.json`.
 
 The extension also adds a command to update all dependencies in the current supported file.
 

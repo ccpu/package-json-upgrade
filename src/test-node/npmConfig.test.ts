@@ -85,27 +85,15 @@ describe('getNpmConfig', () => {
     setConfig(buildTestConfig(false))
   })
 
-  test('should read the registry from the .npmrc next to package.json', () => {
-    withTempProject('registry=https://custom.example.com/\n', (packageJsonPath) => {
-      assert.strictEqual(getNpmConfig(packageJsonPath).registry, 'https://custom.example.com/')
-    })
-  })
-
-  test('should read a scoped registry from the .npmrc next to package.json', () => {
-    withTempProject('@myorg:registry=https://npm.myorg.com/\n', (packageJsonPath) => {
-      assert.strictEqual(getNpmConfig(packageJsonPath)['@myorg:registry'], 'https://npm.myorg.com/')
-    })
-  })
-
-  test('should expand an environment variable used in a project .npmrc', () => {
+  test('should not expand an environment variable used in a project .npmrc', () => {
     withEnvironmentVariable('PACKAGE_JSON_UPGRADE_TEST_TOKEN', 'secret-token', () => {
       const authTokenLine =
-        '//npm.pkg.github.com/:_authToken=$' + '{PACKAGE_JSON_UPGRADE_TEST_TOKEN}\n'
+        '//project-token-leak-test.invalid/:_authToken=$' + '{PACKAGE_JSON_UPGRADE_TEST_TOKEN}\n'
 
       withTempProject(authTokenLine, (packageJsonPath) => {
         assert.strictEqual(
-          getNpmConfig(packageJsonPath)['//npm.pkg.github.com/:_authToken'],
-          'secret-token',
+          getNpmConfig(packageJsonPath)['//project-token-leak-test.invalid/:_authToken'],
+          undefined,
         )
       })
     })
@@ -119,12 +107,34 @@ describe('getNpmConfig', () => {
     })
   })
 
-  test('should let a project .npmrc win over the global one', () => {
+  test('should ignore registry and proxy settings from a project .npmrc', () => {
     withGlobalNpmrc('registry=https://global.example.com/\n', () => {
-      withTempProject('registry=https://project.example.com/\n', (packageJsonPath) => {
-        assert.strictEqual(getNpmConfig(packageJsonPath).registry, 'https://project.example.com/')
-      })
+      withTempProject(
+        'registry=https://project.example.com/\nhttps-proxy=http://proxy.example.com/\n',
+        (packageJsonPath) => {
+          assert.strictEqual(getNpmConfig(packageJsonPath).registry, 'https://global.example.com/')
+          assert.strictEqual(getNpmConfig(packageJsonPath)['https-proxy'], null)
+        },
+      )
     })
+  })
+
+  test('should preserve trusted private-registry credentials', () => {
+    withGlobalNpmrc(
+      'registry=https://registry.example.com/\n//registry.example.com/:_authToken=trusted-token\n',
+      () => {
+        withTempProject(undefined, (packageJsonPath) => {
+          assert.strictEqual(
+            getNpmConfig(packageJsonPath).registry,
+            'https://registry.example.com/',
+          )
+          assert.strictEqual(
+            getNpmConfig(packageJsonPath)['//registry.example.com/:_authToken'],
+            'trusted-token',
+          )
+        })
+      },
+    )
   })
 
   test('should hand back an empty config when the user asked to skip npm config', () => {

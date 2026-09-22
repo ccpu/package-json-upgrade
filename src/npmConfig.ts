@@ -24,6 +24,12 @@ export const getNpmConfig = (packageJsonPath: string): npmRegistryFetch.Options 
         // Maybe we can use cache when we can finally update npm-registry-fetch (currently resting at v14 due to esm issues)
         cache: null,
         prefix: path.dirname(packageJsonPath),
+        // A project .npmrc is repository-controlled. Letting it configure a
+        // proxy, registry, or ${ENV_VAR}-based credential could disclose a
+        // user's token when merely opening an untrusted package.json. `global`
+        // keeps the user, environment, and global sources while skipping the
+        // project/workspace .npmrc files.
+        global: true,
       })
       conf = result.config.snapshot
       packageJsonPathToConfMap[packageJsonPath] = conf

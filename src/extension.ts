@@ -16,12 +16,8 @@ export const GO_TO_CATALOG_ENTRY_COMMAND = 'package-json-upgrade.go-to-catalog-e
 export async function activate(context: vscode.ExtensionContext) {
   try {
     await activateWrapped(context)
-  } catch (e) {
+  } catch {
     console.error(`failed to start`)
-    if (e instanceof Error) {
-      console.error(e.name, e.message)
-      console.error(e.stack)
-    }
   }
 }
 
