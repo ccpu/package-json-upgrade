@@ -1,9 +1,10 @@
 import * as vscode from 'vscode'
 
 import { Config, getConfig, setConfig } from './config'
+import { getDependencyGroups, isDependencyFile } from './dependencyFile'
 import { initGithubCache } from './githubCache'
 import { initLogger } from './log'
-import { cleanNpmCache } from './npm'
+import { cleanNpmCache, clearNpmCacheForDependencies } from './npm'
 import { clearDecorations, handleFileDecoration } from './texteditor'
 import { UpdateAction } from './updateAction'
 import { updateAll } from './updateAll'
@@ -68,7 +69,34 @@ async function activateWrapped(context: vscode.ExtensionContext) {
 
   checkCurrentFiles(showDecorations)
 
-  // vscode.workspace.onDidOpenTextDocument((e: vscode.TextDocument) => {})
+  /**
+   * Opening a dependency file throws away what we cached for the dependencies in
+   * it. The cache otherwise holds for two hours, so a file reopened after an
+   * install would keep showing the versions from before it.
+   */
+  const invalidateCacheForDocument = (document: vscode.TextDocument) => {
+    if (!isDependencyFile(document)) {
+      return
+    }
+
+    try {
+      const dependencyNames = getDependencyGroups(document).flatMap((group) =>
+        group.deps.map((dep) => dep.dependencyName),
+      )
+      clearNpmCacheForDependencies(dependencyNames)
+    } catch {
+      // If the document can't be parsed, don't block editor open.
+    }
+  }
+
+  const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument(
+    (document: vscode.TextDocument) => {
+      if (showDecorations) {
+        invalidateCacheForDocument(document)
+      }
+    },
+  )
+
   // vscode.workspace.onDidSaveTextDocument((e: vscode.TextDocument) => {})
   // vscode.window.onDidChangeVisibleTextEditors((e: vscode.TextEditor[]) => {})
 
@@ -91,6 +119,7 @@ async function activateWrapped(context: vscode.ExtensionContext) {
     onConfigChange,
     onDidChangeActiveTextEditor,
     onDidChangeTextDocument,
+    onDidOpenTextDocument,
     toggleShowCommand,
     updateAllCommand,
   )
